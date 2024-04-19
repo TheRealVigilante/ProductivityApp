@@ -22,43 +22,33 @@ public class TimeRangeLock {
             throw new RuntimeException(e);
         }
     }
-    public static void Time(String[] files) throws IOException {
+    public static void Time(String[] files, String listName) throws IOException {
         if (Applications.isEmpty(files)){
             System.out.println("No files is selected, Try picking some first");
             return;
         }
-        BlacklistGUI.lockWebsites();
+        BlacklistGUI.lockWebsites(listName);
         Applications.LockApplications(files);
         CountdownTimerGUI.TimerSet();
         Applications.UnlockApplications(files);
-        BlacklistGUI.unlockWebsites();
+        BlacklistGUI.unlockWebsites(listName);
 //        do you want to do anything else? if yes, recurse main. if no, System.exit(0);
     }
-    public static void AfterTime(String[] files) throws IOException {
+    public static void AfterTime(String[] files, String listName) throws IOException {
         if (Applications.isEmpty(files)){
             System.out.println("No files is selected");
             return;
         }
         CountdownTimerGUI.TimerSet();
-        BlacklistGUI.lockWebsites();
+        BlacklistGUI.lockWebsites(listName);
         Applications.LockApplications(files);
         System.out.println("\nWait till midnight and it will reset");
         while (!isMidnight());
-        BlacklistGUI.unlockWebsites();
+        BlacklistGUI.unlockWebsites(listName);
         Applications.UnlockApplications(files);
     }
-    public static void TimeLock() throws IOException {
-        BlacklistGUI blacklist = new BlacklistGUI();
-        blacklist.launchGUI();
-        blacklist.waitForSubmit();
-        String[] files= Applications.AbsoluteFinder().toArray(new String[0]);
-        Time(files);//0.611% error
-    }
-    public static void AfterTimeLock() throws IOException {
-        BlacklistGUI blacklist = new BlacklistGUI();
-        blacklist.launchGUI();
-        blacklist.waitForSubmit();
-        String[] files= Applications.AbsoluteFinder().toArray(new String[0]);
-        AfterTime(files);
+
+    public static void main(String[] args) {
+
     }
 }

@@ -110,21 +110,13 @@ public class PasswordGUI extends JFrame {
             }
         });
     }
-    public static void PasswordLock() throws IOException {
-        BlacklistGUI blacklist = new BlacklistGUI();
-        blacklist.launchGUI();
-        blacklist.waitForSubmit();
-        String[] files= Applications.AbsoluteFinder().toArray(new String[0]);
+    public static void PasswordLock(String[] files,String listName) throws IOException {
         Applications.LockApplications(files);
-        BlacklistGUI.lockWebsites();
+        BlacklistGUI.lockWebsites(listName);
         PasswordGUI passwordGUI = new PasswordGUI();
         passwordGUI.launchGUI();
         passwordGUI.waitForSubmit();
         Applications.UnlockApplications(files);
-        BlacklistGUI.unlockWebsites();
-    }
-
-    public static void main(String[] args) throws IOException {
-        PasswordLock();
+        BlacklistGUI.unlockWebsites(listName);
     }
 }

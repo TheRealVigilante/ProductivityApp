@@ -6,26 +6,33 @@ public class Main {
         public static void selectClass(int choice) throws IOException, InterruptedException {
             switch (choice) {
                 case 1:
+                    Scanner scanner = new Scanner(System.in);
+                    System.out.println("Enter the name of this block:");
+                    String listName = scanner.nextLine();
                     System.out.println("Choose an option for Create Block:");
                     System.out.println("a. Block for a time");
                     System.out.println("b. Block After");
                     System.out.println("c. Set A daily Limit");
                     System.out.println("d. Set password");
-                    Scanner scanner = new Scanner(System.in);
+
                     char blockChoice = scanner.next().charAt(0);
                     scanner.close();
+                    BlacklistGUI blacklist = new BlacklistGUI();
+                    blacklist.launchGUI(listName);
+                    blacklist.waitForSubmit();
+                    String[] files= Applications.AbsoluteFinder().toArray(new String[0]);
                     switch (blockChoice) {
                         case 'a':
-                            TimeRangeLock.TimeLock();
+                            TimeRangeLock.Time(files, listName);
                             break;
                         case 'b':
-                            TimeRangeLock.AfterTimeLock();
+                            TimeRangeLock.AfterTime(files, listName);
                             break;
                         case 'c':
-                            DailyLimitLock.DailyLock();
+                            DailyLimitLock.DailyLock(files,listName);
                             break;
                         case 'd':
-                            PasswordGUI.PasswordLock();
+                            PasswordGUI.PasswordLock(files,listName);
                             break;
                         default:
                             System.out.println("Invalid option for Create Block");

@@ -6,12 +6,8 @@ import java.util.Scanner;
 
 public class DailyLimitLock {
 
-    public static void DailyLock() throws InterruptedException, IOException {
+    public static void DailyLock(String[] files,String listName) throws InterruptedException, IOException {
         Scanner scanner = new Scanner(System.in);
-        BlacklistGUI blacklist = new BlacklistGUI();
-        blacklist.launchGUI();
-        blacklist.waitForSubmit();
-        String[] files= Applications.AbsoluteFinder().toArray(new String[0]);
 
         System.out.println("Enter the start time in 24 hour format (hour:minute): ");
         String startTimeStr = scanner.nextLine();
@@ -32,14 +28,14 @@ public class DailyLimitLock {
                 }
                 else {
                     Applications.LockApplications(files);
-                    BlacklistGUI.lockWebsites();
+                    BlacklistGUI.lockWebsites(listName);
                     while (!isAfter(LocalTime.now(),endTime)){
                         System.out.println("Inside prohibited time, apps are locked");
                         Thread.sleep(30000);
                     }
                     System.out.println("Outside prohibited time, unlocking apps now");
                     Applications.UnlockApplications(files);
-                    BlacklistGUI.unlockWebsites();
+                    BlacklistGUI.unlockWebsites(listName);
                     break;
                 }
             }
@@ -55,9 +51,5 @@ public class DailyLimitLock {
 
     public static boolean isAfter(LocalTime currentTime, LocalTime endTime) {
         return currentTime.isAfter(endTime);
-    }
-
-    public static void main(String[] args) throws IOException, InterruptedException {
-        DailyLock();
     }
 }

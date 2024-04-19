@@ -6,15 +6,14 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 
 public class BlacklistGUI extends JFrame {
-    public static String[] getWebsitesList() {
-        return websitesList.toArray(new String[0]);
-    }
     private JTextArea websitesTextArea;
     private JButton submitButton;
     private final Object lock = new Object();
-    private static ArrayList<String> websitesList;
+    private static HashMap<String, WebsiteList> websiteLists = new HashMap<>();
+    private String currentListName;
 
     private void createBlacklist() {
         setTitle("Website Blacklist");
@@ -31,7 +30,7 @@ public class BlacklistGUI extends JFrame {
             @Override
             public void actionPerformed(ActionEvent e) {
                 String[] websitesArray = websitesTextArea.getText().split("\n");
-                websitesList = new ArrayList<>();
+                ArrayList<String> websitesList = new ArrayList<>();
                 for (String website : websitesArray) {
                     websitesList.add(website.trim());
                 }
@@ -49,12 +48,20 @@ public class BlacklistGUI extends JFrame {
     private void onWebsitesListReady(ArrayList<String> list) {
         // Process the websitesList here or notify the caller
         System.out.println("Blacklist: " + list);
+        WebsiteList websiteList = new WebsiteList(currentListName);
+        for (String website : list) {
+            websiteList.addWebsite(website);
+        }
+        websiteLists.put(currentListName, websiteList);
     }
-    public static void lockWebsites() {
-        for (String website : websitesList) {
-            website=Website.format(website);
-            System.out.println("Locking: "+website);
-            Website.blockWebsite(website);
+    public static void lockWebsites(String listName) {
+        WebsiteList websiteList = websiteLists.get(listName);
+        if (websiteList != null) {
+            for (String website : websiteList.getWebsites()) {
+                website = Website.format(website);
+                System.out.println("Locking: " + website);
+                Website.blockWebsite(website);
+            }
         }
     }
     public void waitForSubmit() {
@@ -66,13 +73,17 @@ public class BlacklistGUI extends JFrame {
             }
         }
     }
-    public static void unlockWebsites() throws IOException {
-        for (String website: websitesList){
-            System.out.println("Unlocking: "+website);
-            Website.unblockWebsite(website);
+    public static void unlockWebsites(String listName) throws IOException {
+        WebsiteList websiteList = websiteLists.get(listName);
+        if (websiteList != null) {
+            for (String website : websiteList.getWebsites()) {
+                System.out.println("Unlocking: " + website);
+                Website.unblockWebsite(website);
+            }
         }
     }
-    public void launchGUI() {
+    public void launchGUI(String listName) {
+        this.currentListName = listName;
         SwingUtilities.invokeLater(new Runnable() {
             public void run() {
                 createBlacklist();
