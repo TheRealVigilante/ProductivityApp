@@ -16,17 +16,16 @@ public class Main {
                     System.out.println("d. Set password");
 
                     char blockChoice = scanner.next().charAt(0);
-                    scanner.close();
                     BlacklistGUI blacklist = new BlacklistGUI();
                     blacklist.launchGUI(listName);
                     blacklist.waitForSubmit();
                     String[] files= Applications.AbsoluteFinder().toArray(new String[0]);
                     switch (blockChoice) {
                         case 'a':
-                            TimeRangeLock.Time(files, listName);
+                            CountdownTimerGUI.Time(files, listName);
                             break;
                         case 'b':
-                            TimeRangeLock.AfterTime(files, listName);
+                            CountdownTimerGUI.AfterTime(files, listName);
                             break;
                         case 'c':
                             DailyLimitLock.DailyLock(files,listName);
@@ -45,20 +44,26 @@ public class Main {
                     break;
                 case 3:
                     System.out.println("Choose an option for Create Deadlock:");
-                    System.out.println("a. Block for a time(Under Development)");
-                    System.out.println("b. Block After(Under Development)");
+                    System.out.println("a. Block for a time");
+                    System.out.println("b. Block After");
                     System.out.println("c. Set a daily Limit");
-                    System.out.println("d. Set password(Under Development)");
+                    System.out.println("d. Set password(Under Devolopment)");
                     Scanner scanner2 = new Scanner(System.in);
                     char deadlockChoice = scanner2.next().charAt(0);
-                    scanner2.close();
                     switch (deadlockChoice) {
-                        case 'a', 'b', 'd':
-                            System.out.println("Under Development Currently");
-                            System.exit(0);
+                        case 'a':
+                            Deadlock.TimerDeadlock();
+                            break;
+                        case 'b':
+                            Deadlock.AfterTimerDeadlock();
                             break;
                         case 'c':
-                            DeadDailyLimitLock.DailyLock();
+//                            Deadlock.DailyDeadlock();
+                            System.out.println("Under Development");
+                            System.exit(0);
+                            break;
+                        case 'd':
+                            Deadlock.PassDeadlock();
                             break;
                         default:
                             System.out.println("Invalid option for Create Deadlock");
