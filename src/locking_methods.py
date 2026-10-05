@@ -1,18 +1,16 @@
-"""Python port of LockingMethods.java.
+"""Python port of LockingMethods.java, extended for the persistent engine.
 
-CountdownTimerGUI (window + terminal helpers), PasswordGUI and
-DailyLimitLock, which implement the different block types.
-"""
+Keeps the countdown window, the password dialog and the time helpers used by
+blocks and deadlocks. The old one-shot orchestration (Time / AfterTime /
+PasswordLock / DailyLock) now lives in block_runner.py."""
 
 import threading
 import time
 import tkinter as tk
-from datetime import datetime
+from datetime import datetime, time as dt_time, timedelta
 from tkinter import messagebox
 
-from app_list import Applications
 from gui_utils import exit_application
-from website_list import BlacklistGUI
 
 
 def parse_time(text):
@@ -23,6 +21,22 @@ def parse_time(text):
         except ValueError:
             continue
     raise ValueError("Invalid time format: " + text)
+
+
+def next_midnight_epoch():
+    """Epoch timestamp of the coming midnight."""
+    now = datetime.now()
+    return datetime.combine(now.date() + timedelta(days=1), dt_time(0, 0)).timestamp()
+
+
+def today_window_epochs(start_text, end_text):
+    """Epochs of today's window; an end at or before the start is treated as next day."""
+    now = datetime.now()
+    start = datetime.combine(now.date(), parse_time(start_text))
+    end = datetime.combine(now.date(), parse_time(end_text))
+    if end <= start:
+        end += timedelta(days=1)
+    return start.timestamp(), end.timestamp()
 
 
 def show_countdown_window(hours, minutes, seconds):
@@ -80,17 +94,11 @@ class CountdownTimerGUI:
             hours = int(parts[0])
             minutes = int(parts[1])
             seconds = int(parts[2])
-
-            show_countdown_window(hours, minutes, seconds)
             temp_sec = hours * 3600 + minutes * 60 + seconds
+            show_countdown_window(hours, minutes, seconds)
             CountdownTimerGUI.timer(temp_sec)
         except ValueError:
             print("Invalid input. Please enter valid numbers.")
-
-    @staticmethod
-    def is_midnight():
-        current_time = datetime.now().time()
-        return current_time.hour == 0 and current_time.minute == 0
 
     @staticmethod
     def timer(time_sec):
@@ -99,59 +107,57 @@ class CountdownTimerGUI:
         time_sec = time_sec + int(extra)
         time.sleep(time_sec / 1000)
 
-    @classmethod
-    def time_lock(cls, files, list_name):
-        """Java: CountdownTimerGUI.Time - block for a time."""
-        if Applications.is_empty(files):
-            print("No files is selected, Try picking some first")
-            return
-        BlacklistGUI.lock_websites(list_name)
-        Applications.lock_applications(files)
-        cls.timer_set()
-        Applications.unlock_applications(files)
-        BlacklistGUI.unlock_websites(list_name)
-        # do you want to do anything else? if yes, recurse main. if no, exit
-
-    @classmethod
-    def after_time(cls, files, list_name):
-        """Java: CountdownTimerGUI.AfterTime - block after a delay, until midnight."""
-        if Applications.is_empty(files):
-            print("No files is selected")
-            return
-        cls.timer_set()
-        BlacklistGUI.lock_websites(list_name)
-        Applications.lock_applications(files)
-        print("\nWait till midnight and it will reset")
-        while not cls.is_midnight():
-            time.sleep(1)  # the original busy-spins here; sleep to avoid 100% cpu
-        BlacklistGUI.unlock_websites(list_name)
-        Applications.unlock_applications(files)
-
 
 class PasswordGUI:
-    def __init__(self):
+    def __init__(self, stored_password=None, on_attempt=None):
+        # stored_password: preset password, skips the "Set Password" phase
+        # on_attempt: called with True/False after each unlock attempt
         self.files = None  # kept for parity with the Java original (unused)
-        self.stored_password = None
+        self.stored_password = stored_password
+        self.on_attempt = on_attempt
         self.root = None
         self.password_entry = None
         self.set_password_button = None
         self._submitted = threading.Event()
+        self._cancelled = threading.Event()
         self._thread = None
 
     def launch_gui(self):
         self._thread = threading.Thread(target=self._run, daemon=True)
         self._thread.start()
 
-    def wait_for_submit(self):
-        self._submitted.wait()  # Wait until the button is clicked
+    def wait_for_submit(self, should_abort=None):
+        """Wait for the password; True when accepted, False when cancelled/aborted."""
+        while not self._submitted.is_set():
+            if self._cancelled.is_set():
+                return False
+            if should_abort is not None and should_abort():
+                self.cancel()
+                return False
+            self._submitted.wait(timeout=0.25)
+        return True
+
+    def cancel(self):
+        # tkinter calls must stay on the GUI thread; _poll_cancel closes the window
+        self._cancelled.set()
 
     def _run(self):
         self.root = tk.Tk()
         self.root.title("Password Management")
         self.root.geometry("350x200")
         self.root.protocol("WM_DELETE_WINDOW", exit_application)  # EXIT_ON_CLOSE
-        self._create_set_password_gui()
+        if self.stored_password is None:
+            self._create_set_password_gui()
+        else:
+            self._create_enter_password_gui()
+        self._poll_cancel()
         self.root.mainloop()
+
+    def _poll_cancel(self):
+        if self._cancelled.is_set():
+            self.root.destroy()
+        else:
+            self.root.after(200, self._poll_cancel)
 
     def _create_set_password_gui(self):
         tk.Label(self.root, text="Set Password:").pack()
@@ -190,54 +196,18 @@ class PasswordGUI:
         entered_password = self.password_entry.get()
         if self.stored_password is not None and entered_password == self.stored_password:
             print("Password Correct! Access Granted.")
+            if self.on_attempt is not None:
+                self.on_attempt(True)
             self.root.destroy()  # Close the GUI window
             self._submitted.set()  # Notify the waiting thread
         else:
             print("Incorrect Password! Access Denied.")
+            if self.on_attempt is not None:
+                self.on_attempt(False)
             self.password_entry.delete(0, "end")
-
-    @staticmethod
-    def password_lock(files, list_name):
-        Applications.lock_applications(files)
-        BlacklistGUI.lock_websites(list_name)
-        password_gui = PasswordGUI()
-        password_gui.launch_gui()
-        password_gui.wait_for_submit()
-        Applications.unlock_applications(files)
-        BlacklistGUI.unlock_websites(list_name)
 
 
 class DailyLimitLock:
-    @staticmethod
-    def daily_lock(files, list_name):
-        print("Enter the start time in 24 hour format (hour:minute): ")
-        start_time_str = input()
-        print("Enter the end time in 24 hour format (hour:minute): ")
-        end_time_str = input()
-
-        try:
-            start_time = parse_time(start_time_str)
-            end_time = parse_time(end_time_str)
-            print(start_time)
-            print(end_time)
-            while True:
-                if DailyLimitLock.is_before(datetime.now().time(), start_time):
-                    print("Before start time, please wait...")
-                    time.sleep(10)
-                    print(datetime.now().time())
-                else:
-                    Applications.lock_applications(files)
-                    BlacklistGUI.lock_websites(list_name)
-                    while not DailyLimitLock.is_after(datetime.now().time(), end_time):
-                        print("Inside prohibited time, apps are locked")
-                        time.sleep(30)
-                    print("Outside prohibited time, unlocking apps now")
-                    Applications.unlock_applications(files)
-                    BlacklistGUI.unlock_websites(list_name)
-                    break
-        except ValueError:
-            print("Invalid time format. Please use the format 'hour:minute'.")
-
     @staticmethod
     def is_before(current_time, start_time):
         return current_time < start_time

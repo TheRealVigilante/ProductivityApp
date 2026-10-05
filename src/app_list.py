@@ -58,6 +58,12 @@ class Applications:
         return files
 
     @staticmethod
+    def pick_files(parent=None):
+        """Multi-select file picker; returns absolute paths (possibly empty)."""
+        paths = filedialog.askopenfilenames(parent=parent, title="Choose files")
+        return [os.path.abspath(p) for p in paths]
+
+    @staticmethod
     def remove_duplicates(files):
         seen = set()
         unique = []
