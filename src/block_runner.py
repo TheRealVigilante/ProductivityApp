@@ -37,15 +37,17 @@ def _apply_locks(block):
 
 
 def _release_locks(block):
-    Applications.unlock_applications(block.apps)
+    try:
+        Applications.unlock_applications(block.apps)
+    except Exception as e:
+        print("Error unlocking applications:", e)
     for website in block.websites:
-        print("Unlocking: " + website)
-        BlacklistGUI.unblock_website(website)
-        # also try the normalized form so no hosts entry survives a crash
-        # (raw "https://..." entries never match the formatted hosts line)
-        formatted = BlacklistGUI.format(website)
-        if formatted != website:
-            BlacklistGUI.unblock_website(formatted)
+        try:
+            print("Unlocking: " + website)
+            # unblock_website removes the bare and www forms on both IPs by itself
+            BlacklistGUI.unblock_website(website)
+        except Exception as e:
+            print(f"Error unlocking website {website}:", e)
 
 
 # ----- engagement helpers -----
@@ -156,18 +158,36 @@ def resume_active():
         else:
             storage.clear_deadlock()
             storage.log_event("deadlock_ended", reason="expired")
+
+    active_sites = set()
     for block in storage.get_blocks():
         if not block.active:
+            # Clean up leftover hosts entries from inactive blocks
+            for website in block.websites:
+                try:
+                    BlacklistGUI.unblock_website(website)
+                except Exception:
+                    pass
             continue
         if should_resume(block):
             start_block(block, resume=True)
             resumed.append("block:" + block.name)
+            for w in _websites_to_block(block):
+                active_sites.add(w)
         else:
             # expired while the app was down: clean up leftover hosts entries
             _release_locks(block)
             _mark_inactive(block.name)
             storage.log_event("block_ended", block=block.name, reason="expired")
+
+    # Clean any orphaned entries for saved websites not in active_sites
+    try:
+        BlacklistGUI.clean_unblocked_hosts(active_sites)
+    except Exception:
+        pass
+
     return resumed
+
 
 
 # ----- engagement implementations -----

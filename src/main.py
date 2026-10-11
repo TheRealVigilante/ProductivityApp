@@ -1,13 +1,56 @@
 """Console menu for the blocker (Python port of Main.java, extended).
 
 Blocks and deadlocks persist in data/data.json and are resumed on startup;
-the watchdog relaunches this entry point if it dies mid-block."""
+the watchdog relaunches this entry point if it dies mid-block. On start it
+requests administrator rights (UAC): hosts-file edits and app file locks
+need them."""
+
+import ctypes
+import os
+import sys
 
 import block_runner
 import deadlock
 import storage
 from create_block_gui import CreateBlockGUI
 from edit_block_gui import EditBlockGUI
+
+
+def is_admin():
+    """True when the process already runs with administrator rights."""
+    try:
+        return ctypes.windll.shell32.IsUserAnAdmin() != 0
+    except AttributeError:  # not Windows: there is nothing to elevate
+        return True
+
+
+def run_as_admin():
+    """Relaunch this script elevated (shows the Windows UAC prompt)."""
+    script = os.path.abspath(sys.argv[0])
+    # ShellExecuteW returns a value greater than 32 when the launch worked
+    return ctypes.windll.shell32.ShellExecuteW(
+        None, "runas", sys.executable, f'"{script}"', None, 1) > 32
+
+
+def unblock_all():
+    from website_list import BlacklistGUI
+    print("Unblocking all inactive websites and flushing DNS...")
+    active_sites = set()
+    for block in storage.get_blocks():
+        if block.active:
+            active_sites.update(block.websites)
+        else:
+            for site in block.websites:
+                try:
+                    BlacklistGUI.unblock_website(site)
+                except Exception:
+                    pass
+    try:
+        BlacklistGUI.clean_unblocked_hosts(active_sites)
+    except Exception:
+        pass
+    print("Hosts file cleaned and Windows DNS resolver cache flushed.")
+    print("Note: If your browser still shows a block page, close and reopen your browser.")
 
 
 def select_class(choice):
@@ -37,6 +80,8 @@ def select_class(choice):
             deadlock.pass_deadlock()
         else:
             print("Invalid option for Create Deadlock")
+    elif choice == 4:
+        unblock_all()
     else:
         print("Invalid choice")
 
@@ -50,19 +95,26 @@ def main():
         print("1. Create Block")
         print("2. Edit Block")
         print("3. Create Deadlock")
-        print("4. Exit")
+        print("4. Clean Hosts / Unblock All")
+        print("5. Exit")
         try:
             choice = int(input())
         except ValueError:
             print("Invalid choice")
             continue
-        if choice == 4:
+        if choice == 5:
             return
         select_class(choice)
 
 
+
 if __name__ == "__main__":
     try:
+        if not is_admin():
+            print("Requesting administrator access...")
+            if run_as_admin():
+                sys.exit(0)  # the elevated instance takes over
+            print("Administrator access was refused; website blocking may not work.")
         main()
     except (KeyboardInterrupt, EOFError):
         print()
