@@ -1,9 +1,10 @@
-"""Create/Edit Block dialog with functional tabs.
+"""Create/Edit Block dialog with functional tabs and modern styling.
 
 Moved out of main_gui.py and wired to the persistent storage: the BlackList,
 WhiteList and App List tabs collect real lists, the Lock Type tab picks the
 kind of block, and Create Block saves it to data/data.json and starts it
-immediately (edit mode: an active block is restarted with the new settings)."""
+immediately (edit mode: an active block is restarted with the new settings).
+"""
 
 import tkinter as tk
 from tkinter import messagebox, ttk
@@ -11,7 +12,9 @@ from tkinter import messagebox, ttk
 import block_runner
 import storage
 from app_list import Applications
-from gui_utils import center_window
+from gui_utils import (ACCENT, BG, BORDER, CARD, FONT, FONT_BOLD, FONT_HEADING,
+                       TEXT, TEXT_MUTED, apply_style, center_window,
+                       maximize_window)
 from locking_methods import parse_time
 
 
@@ -23,67 +26,80 @@ class CreateBlockGUI:
         self.app_list_items = list(edit_block.apps) if edit_block else []
 
         self.root = tk.Tk()
-        self.root.title("Create Block" if edit_block is None else "Edit Block")
-        self.root.geometry("400x430")
-        # Close only this window, not the entire application
+        self.root.title("Create Focus Block" if edit_block is None else "Edit Focus Block")
+        self.root.geometry("820x640")
+        self.root.minsize(560, 480)
+        apply_style(self.root)
+        maximize_window(self.root)  # Full screen / maximized by default
         self.root.protocol("WM_DELETE_WINDOW", self.root.destroy)
 
-        # Create tabs
+        # Tabbed interface
         self.tabbed_pane = ttk.Notebook(self.root)
-        self.tabbed_pane.add(self._create_name_panel(), text="Name")
+        self.tabbed_pane.add(self._create_name_panel(), text="🏷️ Name")
         self.tabbed_pane.add(self._create_url_panel(
-            "Enter the URLs you would like to blacklist one at a time:",
-            self.black_list, 1), text="BlackList")
+            "Enter websites to blacklist (e.g. youtube.com, reddit.com):",
+            self.black_list, 1), text="🌐 Blacklist")
         self.tabbed_pane.add(self._create_url_panel(
-            "Whitelisted sites are never blocked by this block:",
-            self.white_list, 2), text="WhiteList")
-        self.tabbed_pane.add(self._create_app_list_panel(), text="App List")
-        self.tabbed_pane.add(self._create_lock_type_panel(), text="Lock Type")
-        self.tabbed_pane.pack(fill="both", expand=True)
+            "Whitelisted domains are excluded from blocking:",
+            self.white_list, 2), text="🛡️ Whitelist")
+        self.tabbed_pane.add(self._create_app_list_panel(), text="💻 Apps")
+        self.tabbed_pane.add(self._create_lock_type_panel(), text="🔒 Mode")
+        self.tabbed_pane.pack(fill="both", expand=True, padx=8, pady=8)
 
         center_window(self.root)
         self.root.mainloop()
 
+
     # ----- tabs -----
 
     def _create_name_panel(self):
-        panel = tk.Frame(self.tabbed_pane)
+        panel = ttk.Frame(self.tabbed_pane, padding=20)
 
-        # Label and text field for entering the block name
-        name_label = tk.Label(panel, text="Enter a name for your block:", anchor="w")
-        self.name_entry = tk.Entry(panel)
+        ttk.Label(panel, text="Profile Name", style="Heading.TLabel").pack(fill="x", pady=(0, 4))
+        ttk.Label(panel, text="Give your focus block a recognizable name:",
+                  style="Muted.TLabel").pack(fill="x", pady=(0, 8))
+
+        self.name_entry = ttk.Entry(panel, font=FONT)
         if self.edit_block is not None:
             self.name_entry.insert(0, self.edit_block.name)
-        # Note text
-        note_label = tk.Label(
+        self.name_entry.pack(fill="x", pady=(0, 8))
+
+        ttk.Label(
             panel,
-            text="Note: Without entering a name, this Block will not be saved.",
-            fg="gray", anchor="w", wraplength=350)
+            text="Tip: Name it after your task, like 'Deep Work', 'Study Session', or 'Writing'.",
+            style="Muted.TLabel", wraplength=420).pack(fill="x")
 
-        # Button container for Next and Cancel buttons
-        button_container = tk.Frame(panel)
-        next_button = tk.Button(button_container, text="Next",
-                                command=lambda: self.tabbed_pane.select(1))
-        cancel_button = tk.Button(button_container, text="Cancel",
-                                  command=self.root.destroy)
+        button_container = ttk.Frame(panel)
+        button_container.pack(side="bottom", fill="x", pady=(14, 0))
+
+        cancel_button = ttk.Button(button_container, text="Cancel", style="TButton",
+                                   command=self.root.destroy)
+        next_button = ttk.Button(button_container, text="Next: Blacklist →", style="Accent.TButton",
+                                 command=lambda: self.tabbed_pane.select(1))
         cancel_button.pack(side="left")
-        next_button.pack(side="left")
+        next_button.pack(side="left", padx=(10, 0))
 
-        name_label.pack(fill="x")
-        self.name_entry.pack(fill="x")
-        note_label.pack(fill="x")
-        tk.Frame(panel, height=35).pack()  # some vertical space
-        button_container.pack(anchor="w")
         return panel
 
     def _create_url_panel(self, label_text, values, next_index):
-        panel = tk.Frame(self.tabbed_pane)
+        panel = ttk.Frame(self.tabbed_pane, padding=20)
 
-        tk.Label(panel, text=label_text, anchor="w", wraplength=350).pack(fill="x", pady=(4, 2))
-        entry = tk.Entry(panel)
-        entry.pack(fill="x")
+        ttk.Label(panel, text="Website URLs", style="Heading.TLabel").pack(fill="x", pady=(0, 2))
+        ttk.Label(panel, text=label_text, style="Muted.TLabel", wraplength=420).pack(
+            fill="x", pady=(0, 8))
 
-        listbox = tk.Listbox(panel, height=7)
+        input_row = ttk.Frame(panel)
+        input_row.pack(fill="x", pady=(0, 8))
+
+        entry = ttk.Entry(input_row, font=FONT)
+        entry.pack(side="left", fill="x", expand=True, padx=(0, 8))
+
+        listbox = tk.Listbox(panel, height=8, bg="#090d16", fg=TEXT, relief="flat",
+                             highlightthickness=1, highlightbackground=BORDER,
+                             highlightcolor=ACCENT, selectbackground=ACCENT,
+                             selectforeground="#ffffff", exportselection=False,
+                             font=FONT, bd=0)
+
         for value in values:
             listbox.insert("end", value)
 
@@ -94,32 +110,45 @@ class CreateBlockGUI:
                 listbox.insert("end", value)
             entry.delete(0, "end")
 
+        entry.bind("<Return>", lambda e: add_url())
+
         def remove_selected():
             for index in reversed(listbox.curselection()):
                 listbox.delete(index)
                 del values[index]
 
-        buttons = tk.Frame(panel)
-        tk.Button(buttons, text="Add", command=add_url).pack(side="left")
-        tk.Button(buttons, text="Remove Selected", command=remove_selected).pack(side="left")
-        buttons.pack(fill="x", pady=4)
+        btn_add = ttk.Button(input_row, text="+ Add", style="Accent.TButton", command=add_url)
+        btn_add.pack(side="left")
+
+        btn_remove = ttk.Button(panel, text="Remove Selected", style="Danger.TButton",
+                                command=remove_selected)
+        btn_remove.pack(anchor="w", pady=(0, 8))
 
         listbox.pack(fill="both", expand=True)
 
-        nav = tk.Frame(panel)
-        tk.Button(nav, text="Cancel", command=self.root.destroy).pack(side="left")
-        tk.Button(nav, text="Next",
-                  command=lambda: self.tabbed_pane.select(next_index + 1)).pack(side="left")
-        nav.pack(anchor="w", pady=6)
+        nav = ttk.Frame(panel)
+        nav.pack(side="bottom", fill="x", pady=(14, 0))
+
+        ttk.Button(nav, text="Cancel", style="TButton",
+                   command=self.root.destroy).pack(side="left")
+        ttk.Button(nav, text="Next →", style="Accent.TButton",
+                   command=lambda: self.tabbed_pane.select(next_index + 1)).pack(
+                       side="left", padx=(10, 0))
+
         return panel
 
     def _create_app_list_panel(self):
-        panel = tk.Frame(self.tabbed_pane)
+        panel = ttk.Frame(self.tabbed_pane, padding=20)
 
-        tk.Label(panel, text="Applications to lock while this block is active:",
-                 anchor="w", wraplength=350).pack(fill="x", pady=(4, 2))
+        ttk.Label(panel, text="Executable Applications", style="Heading.TLabel").pack(fill="x", pady=(0, 2))
+        ttk.Label(panel, text="Applications to lock while this block is running:",
+                  style="Muted.TLabel", wraplength=420).pack(fill="x", pady=(0, 8))
 
-        listbox = tk.Listbox(panel, height=7)
+        listbox = tk.Listbox(panel, height=8, bg="#090d16", fg=TEXT, relief="flat",
+                             highlightthickness=1, highlightbackground=BORDER,
+                             highlightcolor=ACCENT, selectbackground=ACCENT,
+                             selectforeground="#ffffff", exportselection=False,
+                             font=FONT, bd=0)
         for path in self.app_list_items:
             listbox.insert("end", path)
 
@@ -134,63 +163,92 @@ class CreateBlockGUI:
                 listbox.delete(index)
                 del self.app_list_items[index]
 
-        buttons = tk.Frame(panel)
-        tk.Button(buttons, text="Choose files...", command=choose_files).pack(side="left")
-        tk.Button(buttons, text="Remove Selected", command=remove_selected).pack(side="left")
-        buttons.pack(fill="x", pady=4)
+        buttons = ttk.Frame(panel)
+        buttons.pack(fill="x", pady=(0, 8))
+
+        ttk.Button(buttons, text="📁 Choose Files...", style="Accent.TButton",
+                   command=choose_files).pack(side="left")
+        ttk.Button(buttons, text="Remove Selected", style="Danger.TButton",
+                   command=remove_selected).pack(side="left", padx=(8, 0))
 
         listbox.pack(fill="both", expand=True)
 
-        nav = tk.Frame(panel)
-        tk.Button(nav, text="Cancel", command=self.root.destroy).pack(side="left")
-        tk.Button(nav, text="Next", command=lambda: self.tabbed_pane.select(4)).pack(side="left")
-        nav.pack(anchor="w", pady=6)
+        nav = ttk.Frame(panel)
+        nav.pack(side="bottom", fill="x", pady=(14, 0))
+
+        ttk.Button(nav, text="Cancel", style="TButton",
+                   command=self.root.destroy).pack(side="left")
+        ttk.Button(nav, text="Next: Lock Mode →", style="Accent.TButton",
+                   command=lambda: self.tabbed_pane.select(4)).pack(
+                       side="left", padx=(10, 0))
+
         return panel
 
     def _create_lock_type_panel(self):
-        panel = tk.Frame(self.tabbed_pane)
+        panel = ttk.Frame(self.tabbed_pane, padding=20)
+
+        ttk.Label(panel, text="Lock Mechanism", style="Heading.TLabel").pack(fill="x", pady=(0, 2))
+        ttk.Label(panel, text="Choose how this session should be guarded:",
+                  style="Muted.TLabel").pack(fill="x", pady=(0, 10))
 
         self.lock_type = tk.StringVar(
             value=self.edit_block.lock_type if self.edit_block is not None else "timer")
-        for text, value in (("Block for a time", "timer"),
-                            ("Block after a delay, until midnight", "after"),
-                            ("Set a daily limit", "daily"),
-                            ("Set password", "password")):
-            tk.Radiobutton(panel, text=text, value=value, variable=self.lock_type,
-                          command=self._update_lock_fields, anchor="w").pack(fill="x")
+
+        modes = (
+            ("⏱️  Countdown Timer (Hours : Mins : Secs)", "timer"),
+            ("🌙  Delay start, then lock until midnight", "after"),
+            ("📅  Recurring daily window (Prohibited hours)", "daily"),
+            ("🔑  Password protected (Locked until password entered)", "password")
+        )
+        for label, val in modes:
+            ttk.Radiobutton(panel, text=label, value=val,
+                            variable=self.lock_type,
+                            command=self._update_lock_fields).pack(fill="x", pady=3)
+
+        # Dynamic parameter frames
+        params_card = tk.Frame(panel, bg=CARD, padx=14, pady=12,
+                               highlightthickness=1, highlightbackground=BORDER)
+        params_card.pack(fill="x", pady=(12, 0))
 
         # timer / after: duration fields
-        self.duration_frame = tk.Frame(panel)
-        tk.Label(self.duration_frame, text="Hours:Minutes:Seconds", anchor="w").pack(fill="x")
-        duration_row = tk.Frame(self.duration_frame)
-        self.hours_entry = tk.Entry(duration_row, width=5)
-        self.minutes_entry = tk.Entry(duration_row, width=5)
-        self.seconds_entry = tk.Entry(duration_row, width=5)
-        for entry in (self.hours_entry, self.minutes_entry, self.seconds_entry):
-            entry.pack(side="left", padx=(0, 10))
-        duration_row.pack(anchor="w")
+        self.duration_frame = tk.Frame(params_card, bg=CARD)
+        tk.Label(self.duration_frame, text="Duration (Hours : Minutes : Seconds)",
+                 bg=CARD, fg=TEXT, font=FONT_BOLD).pack(fill="x", pady=(0, 4))
+        dur_row = tk.Frame(self.duration_frame, bg=CARD)
+        self.hours_entry = ttk.Entry(dur_row, width=6)
+        self.minutes_entry = ttk.Entry(dur_row, width=6)
+        self.seconds_entry = ttk.Entry(dur_row, width=6)
+
+        self.hours_entry.pack(side="left", padx=(0, 8))
+        self.minutes_entry.pack(side="left", padx=(0, 8))
+        self.seconds_entry.pack(side="left")
+        dur_row.pack(anchor="w")
 
         # daily: window fields
-        self.daily_frame = tk.Frame(panel)
-        tk.Label(self.daily_frame, text="Start and end time (hour:minute, 24h)",
-                 anchor="w").pack(fill="x")
-        daily_row = tk.Frame(self.daily_frame)
-        self.daily_start_entry = tk.Entry(daily_row, width=8)
-        self.daily_end_entry = tk.Entry(daily_row, width=8)
-        self.daily_start_entry.pack(side="left", padx=(0, 10))
+        self.daily_frame = tk.Frame(params_card, bg=CARD)
+        tk.Label(self.daily_frame, text="Prohibited Window (HH:MM to HH:MM)",
+                 bg=CARD, fg=TEXT, font=FONT_BOLD).pack(fill="x", pady=(0, 4))
+        daily_row = tk.Frame(self.daily_frame, bg=CARD)
+        self.daily_start_entry = ttk.Entry(daily_row, width=8)
+        self.daily_end_entry = ttk.Entry(daily_row, width=8)
+        self.daily_start_entry.pack(side="left", padx=(0, 8))
+        tk.Label(daily_row, text="to", bg=CARD, fg=TEXT_MUTED).pack(side="left", padx=(0, 8))
         self.daily_end_entry.pack(side="left")
         daily_row.pack(anchor="w")
 
         # password: entry + confirm
-        self.password_frame = tk.Frame(panel)
-        tk.Label(self.password_frame, text="Password", anchor="w").pack(fill="x")
-        self.password_entry = tk.Entry(self.password_frame, show="*")
-        self.password_entry.pack(fill="x")
-        tk.Label(self.password_frame, text="Confirm password", anchor="w").pack(fill="x")
-        self.password_confirm_entry = tk.Entry(self.password_frame, show="*")
+        self.password_frame = tk.Frame(params_card, bg=CARD)
+        tk.Label(self.password_frame, text="Unlock Password",
+                 bg=CARD, fg=TEXT, font=FONT_BOLD).pack(fill="x", pady=(0, 2))
+        self.password_entry = ttk.Entry(self.password_frame, show="*")
+        self.password_entry.pack(fill="x", pady=(0, 6))
+
+        tk.Label(self.password_frame, text="Confirm Password",
+                 bg=CARD, fg=TEXT, font=FONT_BOLD).pack(fill="x", pady=(0, 2))
+        self.password_confirm_entry = ttk.Entry(self.password_frame, show="*")
         self.password_confirm_entry.pack(fill="x")
 
-        if self.edit_block is not None:  # prefill
+        if self.edit_block is not None:
             duration = self.edit_block.duration_seconds or 0
             self.hours_entry.insert(0, str(duration // 3600))
             self.minutes_entry.insert(0, str((duration % 3600) // 60))
@@ -200,16 +258,17 @@ class CreateBlockGUI:
             self.password_entry.insert(0, self.edit_block.password)
             self.password_confirm_entry.insert(0, self.edit_block.password)
 
-        # Button container (Create/Save and Cancel)
-        button_container = tk.Frame(panel)
-        button_container.pack(side="bottom", fill="x", pady=6)
-        cancel_button = tk.Button(button_container, text="Cancel", command=self.root.destroy)
-        save_button = tk.Button(
+        button_container = ttk.Frame(panel)
+        button_container.pack(side="bottom", fill="x", pady=(14, 0))
+
+        cancel_button = ttk.Button(button_container, text="Cancel", style="TButton",
+                                   command=self.root.destroy)
+        save_button = ttk.Button(
             button_container,
-            text="Save Changes" if self.edit_block is not None else "Create Block",
-            command=self._on_create)
+            text="Save Changes" if self.edit_block is not None else "🚀 Save & Start Block",
+            style="Accent.TButton", command=self._on_create)
         cancel_button.pack(side="left")
-        save_button.pack(side="left")
+        save_button.pack(side="left", padx=(10, 0))
 
         self._update_lock_fields()
         return panel
@@ -220,11 +279,11 @@ class CreateBlockGUI:
         self.daily_frame.pack_forget()
         self.password_frame.pack_forget()
         if kind in ("timer", "after"):
-            self.duration_frame.pack(fill="x", pady=4)
+            self.duration_frame.pack(fill="x")
         elif kind == "daily":
-            self.daily_frame.pack(fill="x", pady=4)
+            self.daily_frame.pack(fill="x")
         else:
-            self.password_frame.pack(fill="x", pady=4)
+            self.password_frame.pack(fill="x")
 
     # ----- saving -----
 
@@ -264,7 +323,7 @@ class CreateBlockGUI:
                 parse_time(daily_end)
             except ValueError:
                 messagebox.showerror("Create Block",
-                                     "Use the time format 'hour:minute'.",
+                                     "Use the time format 'HH:MM' (24-hour).",
                                      parent=self.root)
                 return
         else:  # password
@@ -281,6 +340,7 @@ class CreateBlockGUI:
         else:
             block = storage.Block(name=name)
             was_active = False
+
         block.apps = list(self.app_list_items)
         block.websites = list(self.black_list)
         block.whitelist = list(self.white_list)
@@ -293,12 +353,12 @@ class CreateBlockGUI:
         if self.edit_block is not None:
             storage.log_event("block_updated", block=block.name)
             if was_active:
-                # restart the engagement with the new settings
                 block_runner.stop_block(block.name)
                 block_runner.start_block(block)
             else:
                 storage.upsert_block(block)
         else:
             storage.log_event("block_created", block=block.name)
-            block_runner.start_block(block)  # saves and starts immediately
+            block_runner.start_block(block)
+
         self.root.destroy()
