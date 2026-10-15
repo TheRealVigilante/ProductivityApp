@@ -32,6 +32,9 @@ from website_list import BlacklistGUI
 assert BlacklistGUI.format("www.youtube.com") == "www.youtube.com"
 assert BlacklistGUI.format("https://youtube.com") == "www.youtube.com"
 assert BlacklistGUI.format("https://www.youtube.com") == "www.youtube.com"
+assert BlacklistGUI.format("https://www.youtube.com/") == "www.youtube.com"  # trailing slash used to break blocking
+assert BlacklistGUI.format("http://youtube.com") == "www.youtube.com"
+assert BlacklistGUI.format("youtube.com/watch?v=abc") == "www.youtube.com"
 
 handle, hosts_scratch = tempfile.mkstemp()
 os.close(handle)
@@ -40,11 +43,26 @@ with open(hosts_scratch, "w") as f:
     f.write("# test hosts\n")
 BlacklistGUI.block_website("www.youtube.com")
 BlacklistGUI.block_website("www.facebook.com")
+with open(hosts_scratch) as f:
+    content = f.read()
+assert "127.0.0.1 youtube.com" in content  # the bare domain is blocked too
+assert "::1 www.youtube.com" in content     # and the IPv6 form
+BlacklistGUI.block_website("youtube.com")   # a duplicate block must not add lines
+with open(hosts_scratch) as f:
+    assert f.read().count("127.0.0.1 www.youtube.com") == 1
 BlacklistGUI.unblock_website("youtube.com")
 with open(hosts_scratch) as f:
     content = f.read()
 assert "youtube.com" not in content
 assert "www.facebook.com" in content
+
+# clean_unblocked_hosts should remove facebook if not in active set
+BlacklistGUI.clean_unblocked_hosts(active_websites=set())
+# But if it's in storage, let's also test direct unblock
+BlacklistGUI.unblock_website("www.facebook.com")
+with open(hosts_scratch) as f:
+    assert "facebook.com" not in f.read()
+
 
 assert parse_time("09:30") == dt_time(9, 30)
 assert parse_time("21:05:10") == dt_time(21, 5, 10)
